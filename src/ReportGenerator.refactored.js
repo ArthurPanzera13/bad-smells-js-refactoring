@@ -32,6 +32,46 @@ const ROLE_POLICIES = new Map([
   ['USER', userPolicy],
 ]);
 
+class CsvFormatter {
+  header() {
+    return 'ID,NOME,VALOR,USUARIO\n';
+  }
+
+  row(item, user) {
+    return `${item.id},${item.name},${item.value},${user.name}\n`;
+  }
+
+  footer(total) {
+    return `\nTotal,,\n${total},,\n`;
+  }
+}
+
+class HtmlFormatter {
+  header(user) {
+    return [
+      '<html><body>\n',
+      '<h1>Relatório</h1>\n',
+      `<h2>Usuário: ${user.name}</h2>\n`,
+      '<table>\n',
+      '<tr><th>ID</th><th>Nome</th><th>Valor</th></tr>\n',
+    ].join('');
+  }
+
+  row(item, user, highlighted) {
+    const style = highlighted ? ' style="font-weight:bold;"' : '';
+    return `<tr${style}><td>${item.id}</td><td>${item.name}</td><td>${item.value}</td></tr>\n`;
+  }
+
+  footer(total) {
+    return `</table>\n<h3>Total: ${total}</h3>\n</body></html>\n`;
+  }
+}
+
+const FORMATTERS = new Map([
+  ['CSV', new CsvFormatter()],
+  ['HTML', new HtmlFormatter()],
+]);
+
 export class ReportGenerator {
   constructor(database) {
     this.db = database;
@@ -46,42 +86,16 @@ export class ReportGenerator {
     const policy = ROLE_POLICIES.get(user.role) ?? noAccessPolicy;
     const visibleItems = policy.selectItems(items);
 
-    let report = '';
-    let total = 0;
-
-    // --- Seção do Cabeçalho ---
-    if (reportType === 'CSV') {
-      report += 'ID,NOME,VALOR,USUARIO\n';
-    } else if (reportType === 'HTML') {
-      report += '<html><body>\n';
-      report += '<h1>Relatório</h1>\n';
-      report += `<h2>Usuário: ${user.name}</h2>\n`;
-      report += '<table>\n';
-      report += '<tr><th>ID</th><th>Nome</th><th>Valor</th></tr>\n';
+    const formatter = FORMATTERS.get(reportType);
+    if (!formatter) {
+      return '';
     }
 
-    // --- Seção do Corpo ---
-    for (const item of visibleItems) {
-      if (reportType === 'CSV') {
-        report += `${item.id},${item.name},${item.value},${user.name}\n`;
-        total += item.value;
-      } else if (reportType === 'HTML') {
-        const style = policy.highlightsPriority && item.priority ? ' style="font-weight:bold;"' : '';
-        report += `<tr${style}><td>${item.id}</td><td>${item.name}</td><td>${item.value}</td></tr>\n`;
-        total += item.value;
-      }
-    }
+    const rows = visibleItems.map((item) =>
+      formatter.row(item, user, policy.highlightsPriority && item.priority),
+    );
+    const total = visibleItems.reduce((sum, item) => sum + item.value, 0);
 
-    // --- Seção do Rodapé ---
-    if (reportType === 'CSV') {
-      report += '\nTotal,,\n';
-      report += `${total},,\n`;
-    } else if (reportType === 'HTML') {
-      report += '</table>\n';
-      report += `<h3>Total: ${total}</h3>\n`;
-      report += '</body></html>\n';
-    }
-
-    return report.trim();
+    return [formatter.header(user), ...rows, formatter.footer(total)].join('').trim();
   }
 }
