@@ -1,3 +1,6 @@
+const ADMIN_PRIORITY_THRESHOLD = 1000;
+const USER_MAX_VISIBLE_VALUE = 500;
+
 export class ReportGenerator {
   constructor(database) {
     this.db = database;
@@ -27,7 +30,7 @@ export class ReportGenerator {
     for (const item of items) {
       if (user.role === 'ADMIN') {
         // Admins veem todos os itens
-        if (item.value > 1000) {
+        if (item.value > ADMIN_PRIORITY_THRESHOLD) {
           // Lógica bônus para admins
           item.priority = true;
         }
@@ -42,7 +45,7 @@ export class ReportGenerator {
         }
       } else if (user.role === 'USER') {
         // Users comuns só veem itens de valor baixo
-        if (item.value <= 500) {
+        if (item.value <= USER_MAX_VISIBLE_VALUE) {
           if (reportType === 'CSV') {
             report += `${item.id},${item.name},${item.value},${user.name}\n`;
             total += item.value;
